@@ -189,11 +189,33 @@ func getMovies(w http.ResponseWriter, r *http.Request) {
 	sendJSONResponse(w, http.StatusOK, res)
 }
 
+func enableCors(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Allow only requests from frontend 
+        var SITE_URL = "http://localhost:5173"
+        origin := r.Header.Get("Origin")
+        if origin == SITE_URL {
+            w.Header().Set("Access-Control-Allow-Origin", origin)
+            w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+            w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        }
+
+        // Handle preflight requests (OPTIONS)
+        if r.Method == "OPTIONS" && origin == SITE_URL {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+
+        next.ServeHTTP(w, r)
+    })
+}
+
 func main() {
 	mongoDB = connectToMongoDB()
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Hey boy")
 	})
-    http.HandleFunc("/movies", getMovies)
-	http.ListenAndServe(":8080", nil)
+        mux.HandleFunc("/movies", getMovies)
+	http.ListenAndServe(":8080", enableCors(mux))
 }
